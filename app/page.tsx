@@ -1,63 +1,99 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState } from "react";
+import { useCurrentAccount } from "@mysten/dapp-kit";
+import { Header } from "@/components/Header";
+import { DropZone } from "@/components/DropZone";
+import { useFileUpload } from "@/app/hooks/useFileUpload";
+
+export default function HomePage() {
+  const [uploadedFileId, setUploadedFileId] = useState<string | null>(null);
+
+  const account = useCurrentAccount();
+  const { isUploading, uploadProgress, uploadFile } = useFileUpload();
+
+  const handleFileUpload = async (
+    file: File,
+    isPublic: boolean,
+    accessList: { address: string; expiresAt: number }[]
+  ) => {
+    const result = await uploadFile(file, isPublic, accessList);
+
+    if (result) {
+      setUploadedFileId(result.id);
+    }
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+    <div className="min-h-screen flex flex-col">
+      <Header />
+
+      <main className="flex-1 container mx-auto px-4 py-12">
+        <div className="max-w-2xl mx-auto text-center space-y-8">
+          <div className="space-y-4">
+            <h1 className="text-4xl font-bold tracking-tight">
+              Secure File Sharing
+            </h1>
+            <p className="text-lg text-muted-foreground">
+              Upload files to decentralized storage and control who can access
+              them using blockchain-based permissions.
+            </p>
+          </div>
+
+          {!account ? (
+            <div className="p-8 border rounded-lg bg-muted/50">
+              <p className="text-muted-foreground">
+                Connect your Sui wallet to start uploading files
+              </p>
+            </div>
+          ) : (
+            <>
+              <DropZone
+                onFileSelect={handleFileUpload}
+                isUploading={isUploading}
+                uploadProgress={uploadProgress}
+              />
+
+              {/* Show shareable link after upload */}
+              {uploadedFileId && (
+                <div className="p-4 border rounded-lg bg-muted/50">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Shareable link:
+                  </p>
+                  <code className="text-sm bg-background p-2 rounded block break-all">
+                    {typeof window !== "undefined" && window.location.origin}/file/{uploadedFileId}
+                  </code>
+                </div>
+              )}
+            </>
+          )}
+
+          <div className="pt-8 border-t">
+            <h2 className="text-xl font-semibold mb-4">How it works</h2>
+            <div className="grid md:grid-cols-3 gap-6 text-left">
+              <div className="space-y-2">
+                <div className="text-2xl font-bold text-primary">1</div>
+                <h3 className="font-medium">Upload</h3>
+                <p className="text-sm text-muted-foreground">
+                  Files are stored on Walrus decentralized storage
+                </p>
+              </div>
+              <div className="space-y-2">
+                <div className="text-2xl font-bold text-primary">2</div>
+                <h3 className="font-medium">Share</h3>
+                <p className="text-sm text-muted-foreground">
+                  Grant access to specific wallet addresses with expiration
+                </p>
+              </div>
+              <div className="space-y-2">
+                <div className="text-2xl font-bold text-primary">3</div>
+                <h3 className="font-medium">Control</h3>
+                <p className="text-sm text-muted-foreground">
+                  Revoke access anytime, blockchain verifies permissions
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </main>
     </div>
