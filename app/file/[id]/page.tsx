@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useCurrentAccount } from "@mysten/dapp-kit";
+import { useCurrentAccount, useAutoConnectWallet } from "@mysten/dapp-kit";
 import { Header } from "@/components/Header";
 import { Card } from "@/components/ui/card";
 import { useFileAccess } from "@/app/hooks/useFileAccess";
@@ -17,15 +17,18 @@ export default function FilePage() {
   const params = useParams();
   const fileAccessId = params.id as string;
   const account = useCurrentAccount();
+  const autoConnectStatus = useAutoConnectWallet();
 
-  const {
-    isLoading,
-    canDownload,
-    fileMetadata,
-    error,
-    isDownloading,
-    downloadFile,
-  } = useFileAccess(fileAccessId);
+  const { isLoading, canDownload, error, isDownloading, downloadFile, hasCheckedWithWallet } =
+    useFileAccess(fileAccessId);
+
+  // Show loading if:
+  // 1. Hook is loading, OR
+  // 2. Wallet is still auto-connecting, OR
+  // 3. We have a wallet connected but haven't completed a check with it yet
+  const isWalletConnecting = autoConnectStatus === "idle";
+  const needsWalletCheck = account && !hasCheckedWithWallet;
+  const showLoading = isLoading || isWalletConnecting || needsWalletCheck;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -34,7 +37,7 @@ export default function FilePage() {
       <main className="flex-1 container mx-auto px-4 py-12">
         <div className="max-w-xl mx-auto">
           <Card className="p-8">
-            {isLoading ? (
+            {showLoading ? (
               <LoadingState />
             ) : error ? (
               <ErrorState message={error} />
@@ -44,8 +47,6 @@ export default function FilePage() {
               <AccessDeniedState />
             ) : (
               <DownloadReadyState
-                fileName={fileMetadata?.name}
-                fileSize={fileMetadata?.size}
                 isDownloading={isDownloading}
                 onDownload={downloadFile}
               />

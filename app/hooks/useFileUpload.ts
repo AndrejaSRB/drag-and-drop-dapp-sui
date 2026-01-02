@@ -7,16 +7,26 @@ import {
   useSuiClient,
 } from "@mysten/dapp-kit";
 import { toast } from "sonner";
-import { uploadToWalrus, isMockMode } from "@/lib/services/walrus";
+import { uploadBytesToWalrus, isMockMode } from "@/lib/services/walrus";
 import {
-  buildCreateAndTransferTx,
-  buildGrantAccessTx,
+  buildCreateFileAccessWithSealTx,
   extractFileAccessId,
   isGasError,
   getErrorMessage,
   PrivateAccess,
 } from "@/lib/services/blockchain";
-import { saveFile, StoredFile } from "@/lib/services/fileStorage";
+import {
+  createSealClient,
+  encryptWithSeal,
+  fileToUint8Array,
+  generateEncryptionId,
+  encryptionIdToHex,
+} from "@/lib/services/seal";
+
+export interface UploadResult {
+  id: string;
+  name: string;
+}
 
 interface UseFileUploadReturn {
   isUploading: boolean;
@@ -25,7 +35,7 @@ interface UseFileUploadReturn {
     file: File,
     isPublic: boolean,
     privateAccessList?: PrivateAccess[]
-  ) => Promise<StoredFile | null>;
+  ) => Promise<UploadResult | null>;
 }
 
 export function useFileUpload(): UseFileUploadReturn {
@@ -40,7 +50,7 @@ export function useFileUpload(): UseFileUploadReturn {
     file: File,
     isPublic: boolean,
     privateAccessList?: PrivateAccess[]
-  ): Promise<StoredFile | null> => {
+  ): Promise<UploadResult | null> => {
     if (!account) {
       toast.error("Please connect your wallet first");
       return null;
@@ -50,22 +60,60 @@ export function useFileUpload(): UseFileUploadReturn {
     setUploadProgress(0);
 
     try {
-      // Step 1: Upload to Walrus
+      // =====================================================
+      // STEP 1: Generate encryption ID (client-side)
+      // =====================================================
       setUploadProgress(10);
+      toast.info("Generating encryption identity...");
+
+      const encryptionId = generateEncryptionId();
+      const encryptionIdHex = encryptionIdToHex(encryptionId);
+
+      setUploadProgress(20);
+
+      // =====================================================
+      // STEP 2: Encrypt file with Seal using encryption ID
+      // =====================================================
+      toast.info(isMockMode() ? "Mock mode: Preparing file..." : "Encrypting file with Seal...");
+
+      const fileData = await fileToUint8Array(file);
+      let dataToUpload: Uint8Array;
+
       if (isMockMode()) {
-        toast.info("Mock mode: Skipping Walrus upload...");
+        // In mock mode, skip actual Seal encryption
+        dataToUpload = fileData;
       } else {
-        toast.info("Uploading file to Walrus...");
+        // Real mode: Encrypt with Seal using the encryption ID
+        const sealClient = createSealClient(client as any);
+        dataToUpload = await encryptWithSeal(sealClient, fileData, encryptionIdHex);
       }
 
-      const { blobId } = await uploadToWalrus(file);
-      setUploadProgress(30);
+      setUploadProgress(40);
 
-      // Step 2: Create FileAccess on-chain
+      // =====================================================
+      // STEP 3: Upload encrypted data to Walrus
+      // =====================================================
+      toast.info(isMockMode() ? "Mock mode: Uploading to Walrus..." : "Uploading encrypted file to Walrus...");
+
+      const { blobId } = await uploadBytesToWalrus(dataToUpload);
+
+      setUploadProgress(60);
+
+      // =====================================================
+      // STEP 4: Create FileAccess on-chain (SINGLE TRANSACTION!)
+      // =====================================================
+      // Now we have everything: blobId from Walrus, encryption_id we generated
+      // Create FileAccess + grant access in ONE transaction = ONE wallet approval
       toast.info("Creating access control on blockchain...");
-      const createTx = buildCreateAndTransferTx(blobId, isPublic);
+
+      const createTx = buildCreateFileAccessWithSealTx(
+        blobId,
+        encryptionId,
+        isPublic,
+        privateAccessList || [],
+        account.address
+      );
       const createResult = await signAndExecute({ transaction: createTx });
-      setUploadProgress(50);
 
       // Wait for transaction and get FileAccess object ID
       const txDetails = await client.waitForTransaction({
@@ -78,38 +126,17 @@ export function useFileUpload(): UseFileUploadReturn {
         throw new Error("Failed to get FileAccess object ID");
       }
 
-      // Step 3: Grant access for private files
-      if (!isPublic && privateAccessList && privateAccessList.length > 0) {
-        setUploadProgress(60);
-        toast.info("Granting access to specified addresses...");
+      setUploadProgress(100);
+      toast.success(
+        isMockMode()
+          ? "File uploaded successfully (mock mode)!"
+          : "File encrypted and uploaded successfully!"
+      );
 
-        for (let i = 0; i < privateAccessList.length; i++) {
-          const { address, expiresAt } = privateAccessList[i];
-          const grantTx = buildGrantAccessTx(fileAccessId, address, expiresAt);
-          await signAndExecute({ transaction: grantTx });
-
-          const progressPerAddress = 30 / privateAccessList.length;
-          setUploadProgress(60 + progressPerAddress * (i + 1));
-        }
-      }
-
-      setUploadProgress(95);
-
-      // Step 4: Save to localStorage
-      const uploadedFile: StoredFile = {
+      return {
         id: fileAccessId,
         name: file.name,
-        size: file.size,
-        blobId: blobId,
-        isPublic: isPublic,
-        createdAt: Date.now(),
       };
-
-      saveFile(uploadedFile);
-      setUploadProgress(100);
-      toast.success("File uploaded and secured successfully!");
-
-      return uploadedFile;
     } catch (error) {
       console.error("Upload error:", error);
       const errorMessage = getErrorMessage(error);

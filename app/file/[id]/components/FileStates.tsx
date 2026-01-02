@@ -50,24 +50,12 @@ export function AccessDeniedState() {
   );
 }
 
-function formatFileSize(bytes: number): string {
-  if (!bytes || bytes === 0) return "Unknown size";
-  const k = 1024;
-  const sizes = ["Bytes", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-}
-
 interface DownloadReadyStateProps {
-  fileName?: string;
-  fileSize?: number;
   isDownloading: boolean;
   onDownload: () => void;
 }
 
 export function DownloadReadyState({
-  fileName,
-  fileSize,
   isDownloading,
   onDownload,
 }: DownloadReadyStateProps) {
@@ -76,9 +64,9 @@ export function DownloadReadyState({
       <FileIcon className="h-16 w-16 text-primary" />
 
       <div className="text-center space-y-1">
-        <h2 className="text-xl font-semibold">{fileName || "File"}</h2>
+        <h2 className="text-xl font-semibold">File Ready</h2>
         <p className="text-sm text-muted-foreground">
-          {formatFileSize(fileSize || 0)}
+          You have access to download this file
         </p>
       </div>
 

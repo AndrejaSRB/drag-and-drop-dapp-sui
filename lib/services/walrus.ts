@@ -1,6 +1,7 @@
 import { WALRUS_PUBLISHER, WALRUS_AGGREGATOR } from "@/lib/constants";
 
 // Set to true to skip Walrus and use mock blobId (for testing on-chain logic)
+// Note: Public testnet publishers are often out of funds. Set to false when you have a funded publisher.
 const MOCK_WALRUS = true;
 
 export interface WalrusUploadResult {
@@ -52,6 +53,82 @@ export async function uploadToWalrus(file: File): Promise<WalrusUploadResult> {
   }
 
   return { blobId };
+}
+
+/**
+ * Upload encrypted bytes to Walrus
+ * Used after Seal encryption - the encrypted blob is stored on Walrus
+ */
+export async function uploadBytesToWalrus(data: Uint8Array): Promise<WalrusUploadResult> {
+  if (MOCK_WALRUS) {
+    // MOCK MODE: Skip Walrus, generate fake blobId
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    const blobId = `mock-encrypted-blob-${Date.now()}`;
+    return { blobId };
+  }
+
+  // REAL MODE: Upload encrypted bytes to Walrus
+  // Create a new ArrayBuffer copy to ensure TypeScript compatibility
+  const buffer = new ArrayBuffer(data.length);
+  const view = new Uint8Array(buffer);
+  view.set(data);
+  const blob = new Blob([buffer]);
+
+  const response = await fetch(`${WALRUS_PUBLISHER}/v1/blobs`, {
+    method: "PUT",
+    body: blob,
+    headers: {
+      "Content-Type": "application/octet-stream",
+    },
+  });
+
+  const responseData = await response.json();
+
+  if (!response.ok || responseData.error) {
+    const errorMsg = responseData.error?.message || "Failed to upload to Walrus";
+    const isInsufficientFunds =
+      errorMsg.includes("insufficient balance") || errorMsg.includes("SUI coins");
+
+    const error: WalrusError = {
+      message: isInsufficientFunds
+        ? "Walrus publisher out of funds. Try again later."
+        : errorMsg,
+      isInsufficientFunds,
+    };
+    throw error;
+  }
+
+  const blobId = responseData.newlyCreated?.blobObject?.blobId || responseData.alreadyCertified?.blobId;
+
+  if (!blobId) {
+    throw { message: "No blob ID returned from Walrus", isInsufficientFunds: false };
+  }
+
+  return { blobId };
+}
+
+/**
+ * Fetch encrypted bytes from Walrus
+ * Used before Seal decryption - get the encrypted blob from Walrus
+ */
+export async function fetchBytesFromWalrus(blobId: string): Promise<Uint8Array> {
+  if (MOCK_WALRUS) {
+    // MOCK MODE: Return mock encrypted data
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    // Return some mock bytes that look like encrypted data
+    const mockData = new TextEncoder().encode(`mock-encrypted-content-${blobId}`);
+    return mockData;
+  }
+
+  // REAL MODE: Fetch from Walrus aggregator
+  const response = await fetch(`${WALRUS_AGGREGATOR}/v1/blobs/${blobId}`);
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch from Walrus");
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  return new Uint8Array(arrayBuffer);
 }
 
 /**

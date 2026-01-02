@@ -13,15 +13,7 @@ export function Header() {
           <span className="font-semibold text-lg">SecureShare</span>
         </Link>
 
-        <nav className="flex items-center gap-6">
-          <Link
-            href="/dashboard"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            My Files
-          </Link>
-          <ConnectButton />
-        </nav>
+        <ConnectButton />
       </div>
     </header>
   );
