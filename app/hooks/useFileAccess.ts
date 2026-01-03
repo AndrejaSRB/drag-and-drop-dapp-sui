@@ -176,10 +176,17 @@ export function useFileAccess(fileAccessId: string): UseFileAccessReturn {
         const encryptedData = await fetchBytesFromWalrus(fileMetadata.blobId);
         console.log("[Seal] Walrus fetch complete, bytes:", encryptedData.length);
 
-        // Step 4: Build the seal_approve transaction using encryption_id
-        console.log("[Seal] Step 4: Building seal_approve tx...");
+        // Step 4: Parse the encrypted object to verify the ID
+        console.log("[Seal] Step 4: Parsing encrypted object and building seal_approve tx...");
         console.log("[Seal] FileAccessId:", fileAccessId);
-        console.log("[Seal] EncryptionId (hex):", Array.from(fileMetadata.encryptionId).map(b => b.toString(16).padStart(2, '0')).join(''));
+        console.log("[Seal] EncryptionId from on-chain (hex):", Array.from(fileMetadata.encryptionId).map(b => b.toString(16).padStart(2, '0')).join(''));
+
+        // Import and use EncryptedObject to parse the blob
+        const { EncryptedObject } = await import("@mysten/seal");
+        const parsedObject = EncryptedObject.parse(encryptedData);
+        console.log("[Seal] Encrypted object ID from blob:", parsedObject.id);
+        console.log("[Seal] Encrypted object packageId:", parsedObject.packageId);
+        console.log("[Seal] Encrypted object threshold:", parsedObject.threshold);
         toast.info("Verifying access with key servers...");
         const txBytes = await buildSealApproveTx(
           client,
