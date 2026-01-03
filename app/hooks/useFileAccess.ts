@@ -152,33 +152,44 @@ export function useFileAccess(fileAccessId: string): UseFileAccessReturn {
         // =====================================================
 
         // Step 1: Create session key
+        console.log("[Seal] Step 1: Creating session key...");
         toast.info("Creating decryption session...");
         const sessionKey = await createSessionKey(
           client as any,
           account.address
         );
+        console.log("[Seal] Session key created");
 
         // Step 2: Sign the session key's personal message
+        console.log("[Seal] Step 2: Requesting signature...");
         toast.info("Please sign to verify your identity...");
         const personalMessage = sessionKey.getPersonalMessage();
         const signResult = await signPersonalMessage({
           message: personalMessage,
         });
         await sessionKey.setPersonalMessageSignature(signResult.signature);
+        console.log("[Seal] Signature set");
 
         // Step 3: Fetch encrypted data from Walrus
+        console.log("[Seal] Step 3: Fetching from Walrus, blobId:", fileMetadata.blobId);
         toast.info("Fetching encrypted file from Walrus...");
         const encryptedData = await fetchBytesFromWalrus(fileMetadata.blobId);
+        console.log("[Seal] Walrus fetch complete, bytes:", encryptedData.length);
 
         // Step 4: Build the seal_approve transaction using encryption_id
+        console.log("[Seal] Step 4: Building seal_approve tx...");
+        console.log("[Seal] FileAccessId:", fileAccessId);
+        console.log("[Seal] EncryptionId (hex):", Array.from(fileMetadata.encryptionId).map(b => b.toString(16).padStart(2, '0')).join(''));
         toast.info("Verifying access with key servers...");
         const txBytes = await buildSealApproveTx(
           client,
           fileAccessId,
           fileMetadata.encryptionId
         );
+        console.log("[Seal] Tx bytes built, length:", txBytes.length);
 
         // Step 5: Decrypt with Seal
+        console.log("[Seal] Step 5: Decrypting with Seal key servers...");
         const sealClient = createSealClient(client as any);
         const decryptedData = await decryptWithSeal(
           sealClient,
@@ -186,6 +197,7 @@ export function useFileAccess(fileAccessId: string): UseFileAccessReturn {
           sessionKey,
           txBytes
         );
+        console.log("[Seal] Decryption complete, bytes:", decryptedData.length);
 
         // Step 6: Trigger download
         const blob = uint8ArrayToBlob(decryptedData);
