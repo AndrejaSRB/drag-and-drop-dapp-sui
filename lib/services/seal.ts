@@ -15,7 +15,7 @@
 import { SealClient, SessionKey } from "@mysten/seal";
 import { Transaction } from "@mysten/sui/transactions";
 import type { SuiClient } from "@mysten/sui/client";
-import { PACKAGE_ID, MODULE_NAME, CLOCK_ID, SEAL_KEY_SERVERS } from "@/lib/constants";
+import { PACKAGE_ID, MODULE_NAME, CLOCK_ID } from "@/lib/constants";
 
 // Threshold: Need 2 out of 3 key servers to agree
 const SEAL_THRESHOLD = 2;
@@ -23,14 +23,32 @@ const SEAL_THRESHOLD = 2;
 // Session key TTL in minutes (how long the session is valid)
 const SESSION_TTL_MINUTES = 10;
 
+// Testnet key servers with full URL information
+// The SDK fetches the URL from on-chain but we need valid objectIds
+const TESTNET_KEY_SERVERS = [
+  {
+    objectId: "0x9c949e53c36ab7a9c484ed9e8b43267a77d4b8d70e79aa6b39042e3d4c434105", // Overclock
+    weight: 1,
+  },
+  {
+    objectId: "0x39cef09b24b667bc6ed54f7159d82352fe2d5dd97ca9a5beaa1d21aa774f25a2", // H2O Nodes
+    weight: 1,
+  },
+  {
+    objectId: "0x4cded1abeb52a22b6becb42a91d3686a4c901cf52eee16234214d0b5b2da4c46", // Triton One
+    weight: 1,
+  },
+];
+
 /**
  * Create a SealClient instance
  * This is used for both encryption and decryption
+ * The SDK automatically fetches key server URLs from on-chain based on objectIds
  */
 export function createSealClient(suiClient: SuiClient): SealClient {
   return new SealClient({
     suiClient: suiClient as any, // Type compatibility
-    serverConfigs: SEAL_KEY_SERVERS,
+    serverConfigs: TESTNET_KEY_SERVERS,
     verifyKeyServers: false, // Skip verification for testnet
   });
 }

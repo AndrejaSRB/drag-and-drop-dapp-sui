@@ -7,7 +7,7 @@ import {
   useSuiClient,
 } from "@mysten/dapp-kit";
 import { toast } from "sonner";
-import { uploadBytesToWalrus, isMockMode } from "@/lib/services/walrus";
+import { uploadBytesToWalrus, isWalrusMocked, isSealMocked } from "@/lib/services/walrus";
 import {
   buildCreateFileAccessWithSealTx,
   extractFileAccessId,
@@ -74,12 +74,12 @@ export function useFileUpload(): UseFileUploadReturn {
       // =====================================================
       // STEP 2: Encrypt file with Seal using encryption ID
       // =====================================================
-      toast.info(isMockMode() ? "Mock mode: Preparing file..." : "Encrypting file with Seal...");
+      toast.info(isSealMocked() ? "Mock mode: Skipping encryption..." : "Encrypting file with Seal...");
 
       const fileData = await fileToUint8Array(file);
       let dataToUpload: Uint8Array;
 
-      if (isMockMode()) {
+      if (isSealMocked()) {
         // In mock mode, skip actual Seal encryption
         dataToUpload = fileData;
       } else {
@@ -93,7 +93,7 @@ export function useFileUpload(): UseFileUploadReturn {
       // =====================================================
       // STEP 3: Upload encrypted data to Walrus
       // =====================================================
-      toast.info(isMockMode() ? "Mock mode: Uploading to Walrus..." : "Uploading encrypted file to Walrus...");
+      toast.info(isWalrusMocked() ? "Mock mode: Skipping Walrus upload..." : "Uploading encrypted file to Walrus...");
 
       const { blobId } = await uploadBytesToWalrus(dataToUpload);
 
@@ -127,11 +127,19 @@ export function useFileUpload(): UseFileUploadReturn {
       }
 
       setUploadProgress(100);
-      toast.success(
-        isMockMode()
-          ? "File uploaded successfully (mock mode)!"
-          : "File encrypted and uploaded successfully!"
-      );
+
+      // Build success message based on what was mocked
+      let successMsg = "File uploaded successfully!";
+      if (isSealMocked() && isWalrusMocked()) {
+        successMsg = "File uploaded (mock mode - no encryption/storage)";
+      } else if (isSealMocked()) {
+        successMsg = "File uploaded (mock encryption, real storage)";
+      } else if (isWalrusMocked()) {
+        successMsg = "File encrypted (mock storage)";
+      } else {
+        successMsg = "File encrypted and uploaded!";
+      }
+      toast.success(successMsg);
 
       return {
         id: fileAccessId,

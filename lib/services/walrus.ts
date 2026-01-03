@@ -1,8 +1,24 @@
 import { WALRUS_PUBLISHER, WALRUS_AGGREGATOR } from "@/lib/constants";
 
-// Set to true to skip Walrus and use mock blobId (for testing on-chain logic)
-// Note: Public testnet publishers are often out of funds. Set to false when you have a funded publisher.
-const MOCK_WALRUS = true;
+// ============================================
+// MOCK FLAGS - Control what gets skipped
+// ============================================
+// Override via environment variables:
+//   NEXT_PUBLIC_MOCK_WALRUS=false  → Use real Walrus
+//   NEXT_PUBLIC_MOCK_SEAL=false    → Use real Seal encryption
+//   NEXT_PUBLIC_WALRUS_PUBLISHER=http://localhost:31415 → Local publisher
+//
+// Recommended combinations:
+// - Both true:  Fast UI testing, no external deps
+// - SEAL false, WALRUS true:  Test encryption without needing funded publisher
+// - Both false: Full end-to-end flow (needs funded Walrus publisher)
+// ============================================
+export const MOCK_WALRUS = process.env.NEXT_PUBLIC_MOCK_WALRUS !== "false";
+export const MOCK_SEAL = process.env.NEXT_PUBLIC_MOCK_SEAL !== "false";
+
+// Allow overriding Walrus publisher URL via env (for local publisher)
+export const WALRUS_PUBLISHER_URL =
+  process.env.NEXT_PUBLIC_WALRUS_PUBLISHER || WALRUS_PUBLISHER;
 
 export interface WalrusUploadResult {
   blobId: string;
@@ -20,12 +36,15 @@ export async function uploadToWalrus(file: File): Promise<WalrusUploadResult> {
   if (MOCK_WALRUS) {
     // MOCK MODE: Skip Walrus, generate fake blobId
     await new Promise((resolve) => setTimeout(resolve, 500));
-    const blobId = `mock-blob-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9]/g, "")}`;
+    const blobId = `mock-blob-${Date.now()}-${file.name.replace(
+      /[^a-zA-Z0-9]/g,
+      ""
+    )}`;
     return { blobId };
   }
 
   // REAL MODE: Upload to Walrus
-  const response = await fetch(`${WALRUS_PUBLISHER}/v1/blobs`, {
+  const response = await fetch(`${WALRUS_PUBLISHER_URL}/v1/blobs`, {
     method: "PUT",
     body: file,
   });
@@ -35,7 +54,8 @@ export async function uploadToWalrus(file: File): Promise<WalrusUploadResult> {
   if (!response.ok || data.error) {
     const errorMsg = data.error?.message || "Failed to upload to Walrus";
     const isInsufficientFunds =
-      errorMsg.includes("insufficient balance") || errorMsg.includes("SUI coins");
+      errorMsg.includes("insufficient balance") ||
+      errorMsg.includes("SUI coins");
 
     const error: WalrusError = {
       message: isInsufficientFunds
@@ -46,10 +66,14 @@ export async function uploadToWalrus(file: File): Promise<WalrusUploadResult> {
     throw error;
   }
 
-  const blobId = data.newlyCreated?.blobObject?.blobId || data.alreadyCertified?.blobId;
+  const blobId =
+    data.newlyCreated?.blobObject?.blobId || data.alreadyCertified?.blobId;
 
   if (!blobId) {
-    throw { message: "No blob ID returned from Walrus", isInsufficientFunds: false };
+    throw {
+      message: "No blob ID returned from Walrus",
+      isInsufficientFunds: false,
+    };
   }
 
   return { blobId };
@@ -59,7 +83,9 @@ export async function uploadToWalrus(file: File): Promise<WalrusUploadResult> {
  * Upload encrypted bytes to Walrus
  * Used after Seal encryption - the encrypted blob is stored on Walrus
  */
-export async function uploadBytesToWalrus(data: Uint8Array): Promise<WalrusUploadResult> {
+export async function uploadBytesToWalrus(
+  data: Uint8Array
+): Promise<WalrusUploadResult> {
   if (MOCK_WALRUS) {
     // MOCK MODE: Skip Walrus, generate fake blobId
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -74,7 +100,7 @@ export async function uploadBytesToWalrus(data: Uint8Array): Promise<WalrusUploa
   view.set(data);
   const blob = new Blob([buffer]);
 
-  const response = await fetch(`${WALRUS_PUBLISHER}/v1/blobs`, {
+  const response = await fetch(`${WALRUS_PUBLISHER_URL}/v1/blobs`, {
     method: "PUT",
     body: blob,
     headers: {
@@ -85,9 +111,11 @@ export async function uploadBytesToWalrus(data: Uint8Array): Promise<WalrusUploa
   const responseData = await response.json();
 
   if (!response.ok || responseData.error) {
-    const errorMsg = responseData.error?.message || "Failed to upload to Walrus";
+    const errorMsg =
+      responseData.error?.message || "Failed to upload to Walrus";
     const isInsufficientFunds =
-      errorMsg.includes("insufficient balance") || errorMsg.includes("SUI coins");
+      errorMsg.includes("insufficient balance") ||
+      errorMsg.includes("SUI coins");
 
     const error: WalrusError = {
       message: isInsufficientFunds
@@ -98,10 +126,15 @@ export async function uploadBytesToWalrus(data: Uint8Array): Promise<WalrusUploa
     throw error;
   }
 
-  const blobId = responseData.newlyCreated?.blobObject?.blobId || responseData.alreadyCertified?.blobId;
+  const blobId =
+    responseData.newlyCreated?.blobObject?.blobId ||
+    responseData.alreadyCertified?.blobId;
 
   if (!blobId) {
-    throw { message: "No blob ID returned from Walrus", isInsufficientFunds: false };
+    throw {
+      message: "No blob ID returned from Walrus",
+      isInsufficientFunds: false,
+    };
   }
 
   return { blobId };
@@ -111,12 +144,16 @@ export async function uploadBytesToWalrus(data: Uint8Array): Promise<WalrusUploa
  * Fetch encrypted bytes from Walrus
  * Used before Seal decryption - get the encrypted blob from Walrus
  */
-export async function fetchBytesFromWalrus(blobId: string): Promise<Uint8Array> {
+export async function fetchBytesFromWalrus(
+  blobId: string
+): Promise<Uint8Array> {
   if (MOCK_WALRUS) {
     // MOCK MODE: Return mock encrypted data
     await new Promise((resolve) => setTimeout(resolve, 500));
     // Return some mock bytes that look like encrypted data
-    const mockData = new TextEncoder().encode(`mock-encrypted-content-${blobId}`);
+    const mockData = new TextEncoder().encode(
+      `mock-encrypted-content-${blobId}`
+    );
     return mockData;
   }
 
@@ -173,6 +210,10 @@ function triggerDownload(blob: Blob, fileName: string): void {
   URL.revokeObjectURL(url);
 }
 
-export function isMockMode(): boolean {
+export function isWalrusMocked(): boolean {
   return MOCK_WALRUS;
+}
+
+export function isSealMocked(): boolean {
+  return MOCK_SEAL;
 }

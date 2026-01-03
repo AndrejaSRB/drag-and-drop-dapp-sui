@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useCurrentAccount, useSuiClient, useSignPersonalMessage } from "@mysten/dapp-kit";
 import { toast } from "sonner";
 import { checkCanDownload } from "@/lib/services/blockchain";
-import { fetchBytesFromWalrus, isMockMode } from "@/lib/services/walrus";
+import { fetchBytesFromWalrus, isWalrusMocked, isSealMocked } from "@/lib/services/walrus";
 import {
   createSealClient,
   createSessionKey,
@@ -123,9 +123,9 @@ export function useFileAccess(fileAccessId: string): UseFileAccessReturn {
     setIsDownloading(true);
 
     try {
-      if (isMockMode()) {
+      if (isSealMocked() && isWalrusMocked()) {
         // =====================================================
-        // MOCK MODE: Skip Seal decryption
+        // FULL MOCK MODE: Skip both Seal and Walrus
         // =====================================================
         toast.info("Mock mode: Simulating download...");
         await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -135,6 +135,17 @@ export function useFileAccess(fileAccessId: string): UseFileAccessReturn {
         triggerDownload(blob, "download.txt");
 
         toast.success("File downloaded (mock mode)!");
+      } else if (isSealMocked()) {
+        // =====================================================
+        // SEAL MOCKED: Real Walrus fetch, no decryption
+        // =====================================================
+        toast.info("Fetching file from Walrus...");
+        const rawData = await fetchBytesFromWalrus(fileMetadata.blobId);
+
+        const blob = uint8ArrayToBlob(rawData);
+        triggerDownload(blob, "download");
+
+        toast.success("File downloaded (no decryption)!");
       } else {
         // =====================================================
         // REAL MODE: Seal decryption flow

@@ -21,7 +21,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Header />
+      <Header onLogoClick={resetFlow} />
 
       <main className="flex-1 container mx-auto px-4 py-12">
         <div className="max-w-2xl mx-auto text-center space-y-8">
