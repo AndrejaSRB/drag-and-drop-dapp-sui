@@ -147,11 +147,34 @@ export async function decryptWithSeal(
   sessionKey: SessionKey,
   txBytes: Uint8Array
 ): Promise<Uint8Array> {
-  return await sealClient.decrypt({
-    data: encryptedData,
-    sessionKey,
-    txBytes,
-  });
+  try {
+    console.log("[Seal] Calling sealClient.decrypt...");
+    console.log("[Seal] Encrypted data length:", encryptedData.length);
+    console.log("[Seal] TxBytes length:", txBytes.length);
+
+    const result = await sealClient.decrypt({
+      data: encryptedData,
+      sessionKey,
+      txBytes,
+    });
+
+    console.log("[Seal] Decrypt successful, result length:", result.length);
+    return result;
+  } catch (err: any) {
+    console.error("[Seal] Decrypt failed:", err);
+    console.error("[Seal] Error type:", err?.constructor?.name);
+    console.error("[Seal] Error message:", err?.message);
+
+    // Check for specific Seal error types
+    if (err?.name) {
+      console.error("[Seal] Error name:", err.name);
+    }
+    if (err?.errors) {
+      console.error("[Seal] Nested errors:", err.errors);
+    }
+
+    throw err;
+  }
 }
 
 /**

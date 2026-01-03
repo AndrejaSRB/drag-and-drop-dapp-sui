@@ -205,8 +205,16 @@ export function useFileAccess(fileAccessId: string): UseFileAccessReturn {
 
         toast.success("File decrypted and downloaded!");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Download error:", err);
+      console.error("Error name:", err?.name);
+      console.error("Error message:", err?.message);
+      console.error("Error stack:", err?.stack);
+
+      // Try to get more details if available
+      if (err?.cause) {
+        console.error("Error cause:", err.cause);
+      }
 
       // Check for specific Seal errors
       const errorStr = String(err);
@@ -216,6 +224,8 @@ export function useFileAccess(fileAccessId: string): UseFileAccessReturn {
         toast.error("Session expired. Please try again.");
       } else if (errorStr.includes("User rejected")) {
         toast.error("Signature rejected. Cannot decrypt without verification.");
+      } else if (errorStr.includes("Failed to fetch")) {
+        toast.error("Network error connecting to key servers. Check console for details.");
       } else {
         toast.error("Failed to download file. Please try again.");
       }
