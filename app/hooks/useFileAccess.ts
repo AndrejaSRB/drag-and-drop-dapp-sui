@@ -238,15 +238,17 @@ export function useFileAccess(fileAccessId: string): UseFileAccessReturn {
       }
 
       // Check for specific Seal errors
-      const errorStr = String(err);
+      const errorStr = String(err?.message || err);
       if (errorStr.includes("NoAccessError")) {
         toast.error("Access denied. You don't have permission to decrypt this file.");
       } else if (errorStr.includes("ExpiredSessionKeyError")) {
         toast.error("Session expired. Please try again.");
       } else if (errorStr.includes("User rejected")) {
         toast.error("Signature rejected. Cannot decrypt without verification.");
+      } else if (errorStr.includes("just created") || errorStr.includes("try again later")) {
+        toast.error("File was just created. Please wait a few seconds and try again.");
       } else if (errorStr.includes("Failed to fetch")) {
-        toast.error("Network error connecting to key servers. Check console for details.");
+        toast.error("Network error connecting to key servers. Please try again in a moment.");
       } else {
         toast.error("Failed to download file. Please try again.");
       }
