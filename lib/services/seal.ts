@@ -148,42 +148,24 @@ export async function decryptWithSeal(
   txBytes: Uint8Array,
   maxRetries: number = 3
 ): Promise<Uint8Array> {
-  let lastError: any;
+  let lastError: unknown;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`[Seal] Calling sealClient.decrypt... (attempt ${attempt}/${maxRetries})`);
-      console.log("[Seal] Encrypted data length:", encryptedData.length);
-      console.log("[Seal] TxBytes length:", txBytes.length);
-
       const result = await sealClient.decrypt({
         data: encryptedData,
         sessionKey,
         txBytes,
       });
-
-      console.log("[Seal] Decrypt successful, result length:", result.length);
       return result;
-    } catch (err: any) {
+    } catch (err: unknown) {
       lastError = err;
-      console.error(`[Seal] Decrypt failed (attempt ${attempt}):`, err);
-      console.error("[Seal] Error type:", err?.constructor?.name);
-      console.error("[Seal] Error message:", err?.message);
-
-      // Check for specific Seal error types
-      if (err?.name) {
-        console.error("[Seal] Error name:", err.name);
-      }
-      if (err?.errors) {
-        console.error("[Seal] Nested errors:", err.errors);
-      }
 
       // Check if this is a "just created" timing error - retry with delay
-      const errorStr = String(err?.message || err);
+      const errorStr = String((err as Error)?.message || err);
       if (errorStr.includes("just created") || errorStr.includes("try again later")) {
         if (attempt < maxRetries) {
           const delayMs = attempt * 3000; // 3s, 6s, 9s
-          console.log(`[Seal] Object may be newly created, waiting ${delayMs}ms before retry...`);
           await new Promise(resolve => setTimeout(resolve, delayMs));
           continue;
         }

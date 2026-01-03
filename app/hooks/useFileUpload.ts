@@ -155,7 +155,6 @@ export function useFileUpload(): UseFileUploadReturn {
         name: file.name,
       };
     } catch (error) {
-      console.error("Upload error:", error);
       const errorMessage = getErrorMessage(error);
 
       if (isGasError(errorMessage)) {

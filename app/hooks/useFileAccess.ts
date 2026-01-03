@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useCurrentAccount, useSuiClient, useSignPersonalMessage } from "@mysten/dapp-kit";
 import { toast } from "sonner";
-import { checkCanDownload } from "@/lib/services/blockchain";
 import { fetchBytesFromWalrus, isWalrusMocked, isSealMocked } from "@/lib/services/walrus";
 import {
   createSealClient,
@@ -97,8 +96,7 @@ export function useFileAccess(fileAccessId: string): UseFileAccessReturn {
       );
       setCanDownload(hasAccess);
       setLastCheckedAddress(account.address);
-    } catch (err) {
-      console.error("Error checking access:", err);
+    } catch {
       setError("Failed to check access permissions.");
     } finally {
       setIsLoading(false);
@@ -155,58 +153,34 @@ export function useFileAccess(fileAccessId: string): UseFileAccessReturn {
         // REAL MODE: Seal decryption flow
         // =====================================================
 
-        // Step 0: Debug - check access before attempting Seal
-        console.log("[Debug] Current account:", account.address);
-        const manualCheck = await checkCanDownload(client, fileAccessId, account.address);
-        console.log("[Debug] Manual can_download check:", manualCheck);
-
         // Step 1: Create session key
-        console.log("[Seal] Step 1: Creating session key...");
         toast.info("Creating decryption session...");
         const sessionKey = await createSessionKey(
           client as any,
           account.address
         );
-        console.log("[Seal] Session key created");
-        console.log("[Debug] Session key address:", (sessionKey as any).getAddress?.() || (sessionKey as any).address || "unknown");
 
         // Step 2: Sign the session key's personal message
-        console.log("[Seal] Step 2: Requesting signature...");
         toast.info("Please sign to verify your identity...");
         const personalMessage = sessionKey.getPersonalMessage();
         const signResult = await signPersonalMessage({
           message: personalMessage,
         });
         await sessionKey.setPersonalMessageSignature(signResult.signature);
-        console.log("[Seal] Signature set");
 
         // Step 3: Fetch encrypted data from Walrus
-        console.log("[Seal] Step 3: Fetching from Walrus, blobId:", fileMetadata.blobId);
         toast.info("Fetching encrypted file from Walrus...");
         const encryptedData = await fetchBytesFromWalrus(fileMetadata.blobId);
-        console.log("[Seal] Walrus fetch complete, bytes:", encryptedData.length);
 
-        // Step 4: Parse the encrypted object to verify the ID
-        console.log("[Seal] Step 4: Parsing encrypted object and building seal_approve tx...");
-        console.log("[Seal] FileAccessId:", fileAccessId);
-        console.log("[Seal] EncryptionId from on-chain (hex):", Array.from(fileMetadata.encryptionId).map(b => b.toString(16).padStart(2, '0')).join(''));
-
-        // Import and use EncryptedObject to parse the blob
-        const { EncryptedObject } = await import("@mysten/seal");
-        const parsedObject = EncryptedObject.parse(encryptedData);
-        console.log("[Seal] Encrypted object ID from blob:", parsedObject.id);
-        console.log("[Seal] Encrypted object packageId:", parsedObject.packageId);
-        console.log("[Seal] Encrypted object threshold:", parsedObject.threshold);
+        // Step 4: Build seal_approve transaction
         toast.info("Verifying access with key servers...");
         const txBytes = await buildSealApproveTx(
           client,
           fileAccessId,
           fileMetadata.encryptionId
         );
-        console.log("[Seal] Tx bytes built, length:", txBytes.length);
 
         // Step 5: Decrypt with Seal
-        console.log("[Seal] Step 5: Decrypting with Seal key servers...");
         const sealClient = createSealClient(client as any);
         const decryptedData = await decryptWithSeal(
           sealClient,
@@ -214,31 +188,17 @@ export function useFileAccess(fileAccessId: string): UseFileAccessReturn {
           sessionKey,
           txBytes
         );
-        console.log("[Seal] Decryption complete, bytes:", decryptedData.length);
 
         // Step 6: Extract metadata and trigger download
-        console.log("[Seal] Step 6: Extracting file metadata...");
         const { metadata, fileData } = extractFileMetadata(decryptedData);
-        console.log("[Seal] File metadata:", metadata);
 
         const blob = uint8ArrayToBlob(fileData, metadata.type);
         triggerDownload(blob, metadata.name);
 
         toast.success(`File "${metadata.name}" decrypted and downloaded!`);
       }
-    } catch (err: any) {
-      console.error("Download error:", err);
-      console.error("Error name:", err?.name);
-      console.error("Error message:", err?.message);
-      console.error("Error stack:", err?.stack);
-
-      // Try to get more details if available
-      if (err?.cause) {
-        console.error("Error cause:", err.cause);
-      }
-
-      // Check for specific Seal errors
-      const errorStr = String(err?.message || err);
+    } catch (err: unknown) {
+      const errorStr = String((err as Error)?.message || err);
       if (errorStr.includes("NoAccessError")) {
         toast.error("Access denied. You don't have permission to decrypt this file.");
       } else if (errorStr.includes("ExpiredSessionKeyError")) {
