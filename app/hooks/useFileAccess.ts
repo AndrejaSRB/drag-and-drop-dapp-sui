@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useCurrentAccount, useSuiClient, useSignPersonalMessage } from "@mysten/dapp-kit";
 import { toast } from "sonner";
+import { checkCanDownload } from "@/lib/services/blockchain";
 import { fetchBytesFromWalrus, isWalrusMocked, isSealMocked } from "@/lib/services/walrus";
 import {
   createSealClient,
