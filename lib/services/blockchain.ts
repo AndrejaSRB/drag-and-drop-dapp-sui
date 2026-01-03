@@ -30,45 +30,36 @@ export function buildCreateAndTransferTx(
 }
 
 /**
- * Create FileAccess AND grant access to multiple addresses in a single PTB
- * This combines everything into one transaction = one wallet approval
- * Updated for new contract with encryption_id field
+ * Create FileAccess AND grant access to multiple addresses in a single transaction
+ * Uses the new create_with_access_and_share entry function which:
+ * 1. Creates the FileAccess object
+ * 2. Grants access to all specified addresses
+ * 3. Shares the object (so grantees can access it for seal_approve)
  */
 export function buildCreateWithAccessTx(
   blobId: string,
   encryptionId: Uint8Array,
   isPublic: boolean,
   privateAccessList: PrivateAccess[],
-  ownerAddress: string
+  _ownerAddress: string // kept for API compatibility but not used
 ): Transaction {
   const tx = new Transaction();
 
-  // Step 1: Create the FileAccess object (returns it, doesn't transfer)
-  const [fileAccess] = tx.moveCall({
-    target: `${PACKAGE_ID}::access_grant::create_file_access`,
+  // Extract addresses and expiry values into separate arrays for the Move function
+  const users = privateAccessList.map(p => p.address);
+  const expiresAtValues = privateAccessList.map(p => p.expiresAt);
+
+  tx.moveCall({
+    target: `${PACKAGE_ID}::access_grant::create_with_access_and_share`,
     arguments: [
       tx.pure.string(blobId),
       tx.pure.vector("u8", Array.from(encryptionId)),
       tx.pure.bool(isPublic),
+      tx.pure.vector("address", users),
+      tx.pure.vector("u64", expiresAtValues),
       tx.object(CLOCK_ID),
     ],
   });
-
-  // Step 2: Grant access to each address in the list
-  for (const { address, expiresAt } of privateAccessList) {
-    tx.moveCall({
-      target: `${PACKAGE_ID}::access_grant::grant_access`,
-      arguments: [
-        fileAccess, // Use the object from step 1
-        tx.pure.address(address),
-        tx.pure.u64(expiresAt),
-        tx.object(CLOCK_ID),
-      ],
-    });
-  }
-
-  // Step 3: Transfer the FileAccess object to the owner
-  tx.transferObjects([fileAccess], ownerAddress);
 
   return tx;
 }
@@ -192,36 +183,26 @@ export function buildCreateFileAccessWithSealTx(
   encryptionId: Uint8Array,
   isPublic: boolean,
   privateAccessList: PrivateAccess[],
-  ownerAddress: string
+  _ownerAddress: string // kept for API compatibility but not used
 ): Transaction {
   const tx = new Transaction();
 
-  // Create FileAccess with blobId and encryption_id
-  const [fileAccess] = tx.moveCall({
-    target: `${PACKAGE_ID}::access_grant::create_file_access`,
+  // Extract addresses and expiry values into separate arrays for the Move function
+  const users = privateAccessList.map(p => p.address);
+  const expiresAtValues = privateAccessList.map(p => p.expiresAt);
+
+  // Use the new entry function that creates, grants access, and shares in one call
+  tx.moveCall({
+    target: `${PACKAGE_ID}::access_grant::create_with_access_and_share`,
     arguments: [
       tx.pure.string(blobId),
       tx.pure.vector("u8", Array.from(encryptionId)),
       tx.pure.bool(isPublic),
+      tx.pure.vector("address", users),
+      tx.pure.vector("u64", expiresAtValues),
       tx.object(CLOCK_ID),
     ],
   });
-
-  // Grant access to each address
-  for (const { address, expiresAt } of privateAccessList) {
-    tx.moveCall({
-      target: `${PACKAGE_ID}::access_grant::grant_access`,
-      arguments: [
-        fileAccess,
-        tx.pure.address(address),
-        tx.pure.u64(expiresAt),
-        tx.object(CLOCK_ID),
-      ],
-    });
-  }
-
-  // Transfer to owner
-  tx.transferObjects([fileAccess], ownerAddress);
 
   return tx;
 }

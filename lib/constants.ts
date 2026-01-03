@@ -1,6 +1,6 @@
 // Contract deployment info (from testnet deployment)
-// Updated with shared object support for multi-user access
-export const PACKAGE_ID = "0x6ab6e9cfbf6fd79b15cb1d98ad5bd1d1f903a0530c465aa410a0b7e512cd1f00";
+// Updated with create_with_access_and_share for proper shared object support
+export const PACKAGE_ID = "0x462708965638752db291d4a6809a5f43a95da2f77f926bb28cf20dd9cb261e31";
 export const CLOCK_ID = "0x6"; // Sui's global clock object
 
 // Walrus configuration (testnet)
