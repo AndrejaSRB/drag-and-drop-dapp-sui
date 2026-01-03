@@ -21,6 +21,7 @@ import {
   fileToUint8Array,
   generateEncryptionId,
   encryptionIdToHex,
+  prependFileMetadata,
 } from "@/lib/services/seal";
 
 export interface UploadResult {
@@ -77,15 +78,23 @@ export function useFileUpload(): UseFileUploadReturn {
       toast.info(isSealMocked() ? "Mock mode: Skipping encryption..." : "Encrypting file with Seal...");
 
       const fileData = await fileToUint8Array(file);
+
+      // Prepend metadata (filename, type, size) so we can restore it on download
+      const dataWithMetadata = prependFileMetadata(fileData, {
+        name: file.name,
+        type: file.type || "application/octet-stream",
+        size: file.size,
+      });
+
       let dataToUpload: Uint8Array;
 
       if (isSealMocked()) {
-        // In mock mode, skip actual Seal encryption
-        dataToUpload = fileData;
+        // In mock mode, skip actual Seal encryption but keep metadata
+        dataToUpload = dataWithMetadata;
       } else {
         // Real mode: Encrypt with Seal using the encryption ID
         const sealClient = createSealClient(client as any);
-        dataToUpload = await encryptWithSeal(sealClient, fileData, encryptionIdHex);
+        dataToUpload = await encryptWithSeal(sealClient, dataWithMetadata, encryptionIdHex);
       }
 
       setUploadProgress(40);

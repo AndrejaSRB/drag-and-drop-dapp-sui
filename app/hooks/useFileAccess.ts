@@ -11,6 +11,7 @@ import {
   buildSealApproveTx,
   decryptWithSeal,
   uint8ArrayToBlob,
+  extractFileMetadata,
 } from "@/lib/services/seal";
 
 export interface FileMetadata {
@@ -132,24 +133,32 @@ export function useFileAccess(fileAccessId: string): UseFileAccessReturn {
 
         const mockContent = `This is a mock decrypted file.\nFile Access ID: ${fileAccessId}\nBlob ID: ${fileMetadata.blobId}`;
         const blob = new Blob([mockContent], { type: "text/plain" });
-        triggerDownload(blob, "download.txt");
+        triggerDownload(blob, "mock-file.txt");
 
         toast.success("File downloaded (mock mode)!");
       } else if (isSealMocked()) {
         // =====================================================
         // SEAL MOCKED: Real Walrus fetch, no decryption
+        // Data still has metadata prepended, extract it
         // =====================================================
         toast.info("Fetching file from Walrus...");
         const rawData = await fetchBytesFromWalrus(fileMetadata.blobId);
 
-        const blob = uint8ArrayToBlob(rawData);
-        triggerDownload(blob, "download");
+        // Extract metadata and file data
+        const { metadata, fileData } = extractFileMetadata(rawData);
+        const blob = uint8ArrayToBlob(fileData, metadata.type);
+        triggerDownload(blob, metadata.name);
 
         toast.success("File downloaded (no decryption)!");
       } else {
         // =====================================================
         // REAL MODE: Seal decryption flow
         // =====================================================
+
+        // Step 0: Debug - check access before attempting Seal
+        console.log("[Debug] Current account:", account.address);
+        const manualCheck = await checkCanDownload(client, fileAccessId, account.address);
+        console.log("[Debug] Manual can_download check:", manualCheck);
 
         // Step 1: Create session key
         console.log("[Seal] Step 1: Creating session key...");
@@ -159,6 +168,7 @@ export function useFileAccess(fileAccessId: string): UseFileAccessReturn {
           account.address
         );
         console.log("[Seal] Session key created");
+        console.log("[Debug] Session key address:", (sessionKey as any).getAddress?.() || (sessionKey as any).address || "unknown");
 
         // Step 2: Sign the session key's personal message
         console.log("[Seal] Step 2: Requesting signature...");
@@ -206,11 +216,15 @@ export function useFileAccess(fileAccessId: string): UseFileAccessReturn {
         );
         console.log("[Seal] Decryption complete, bytes:", decryptedData.length);
 
-        // Step 6: Trigger download
-        const blob = uint8ArrayToBlob(decryptedData);
-        triggerDownload(blob, "download");
+        // Step 6: Extract metadata and trigger download
+        console.log("[Seal] Step 6: Extracting file metadata...");
+        const { metadata, fileData } = extractFileMetadata(decryptedData);
+        console.log("[Seal] File metadata:", metadata);
 
-        toast.success("File decrypted and downloaded!");
+        const blob = uint8ArrayToBlob(fileData, metadata.type);
+        triggerDownload(blob, metadata.name);
+
+        toast.success(`File "${metadata.name}" decrypted and downloaded!`);
       }
     } catch (err: any) {
       console.error("Download error:", err);

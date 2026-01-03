@@ -185,6 +185,74 @@ export async function fileToUint8Array(file: File): Promise<Uint8Array> {
   return new Uint8Array(arrayBuffer);
 }
 
+// ============================================
+// FILE METADATA HANDLING
+// ============================================
+// We prepend metadata to the file before encryption so that
+// on download we know the original filename and MIME type.
+// Format: [4 bytes: metadata length][JSON metadata][file bytes]
+
+export interface FileMetadataHeader {
+  name: string;
+  type: string;
+  size: number;
+}
+
+/**
+ * Prepend metadata to file data before encryption
+ * Format: [4 bytes little-endian length][UTF-8 JSON metadata][raw file bytes]
+ */
+export function prependFileMetadata(
+  fileData: Uint8Array,
+  metadata: FileMetadataHeader
+): Uint8Array {
+  const metadataJson = JSON.stringify(metadata);
+  const metadataBytes = new TextEncoder().encode(metadataJson);
+
+  // Create 4-byte length prefix (little-endian)
+  const lengthBytes = new Uint8Array(4);
+  const view = new DataView(lengthBytes.buffer);
+  view.setUint32(0, metadataBytes.length, true); // true = little-endian
+
+  // Combine: [length][metadata][fileData]
+  const combined = new Uint8Array(4 + metadataBytes.length + fileData.length);
+  combined.set(lengthBytes, 0);
+  combined.set(metadataBytes, 4);
+  combined.set(fileData, 4 + metadataBytes.length);
+
+  return combined;
+}
+
+/**
+ * Extract metadata and file data after decryption
+ * Returns the metadata and the original file bytes
+ */
+export function extractFileMetadata(
+  data: Uint8Array
+): { metadata: FileMetadataHeader; fileData: Uint8Array } {
+  if (data.length < 4) {
+    throw new Error("Invalid data: too short to contain metadata");
+  }
+
+  // Read 4-byte length prefix (little-endian)
+  const view = new DataView(data.buffer, data.byteOffset, 4);
+  const metadataLength = view.getUint32(0, true);
+
+  if (data.length < 4 + metadataLength) {
+    throw new Error("Invalid data: metadata length exceeds data size");
+  }
+
+  // Extract metadata JSON
+  const metadataBytes = data.slice(4, 4 + metadataLength);
+  const metadataJson = new TextDecoder().decode(metadataBytes);
+  const metadata: FileMetadataHeader = JSON.parse(metadataJson);
+
+  // Extract file data
+  const fileData = data.slice(4 + metadataLength);
+
+  return { metadata, fileData };
+}
+
 /**
  * Generate a random encryption ID as bytes
  * This is used as the identity for Seal encryption.
