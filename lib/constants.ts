@@ -1,6 +1,6 @@
 // Contract deployment info (from testnet deployment)
-// Updated with encryption_id field for single-PTB Seal flow
-export const PACKAGE_ID = "0x53f7695b119d6df796fcc5b3e3c348ea9127754741dafcc0f8987533c273b767";
+// Updated with shared object support for multi-user access
+export const PACKAGE_ID = "0x6ab6e9cfbf6fd79b15cb1d98ad5bd1d1f903a0530c465aa410a0b7e512cd1f00";
 export const CLOCK_ID = "0x6"; // Sui's global clock object
 
 // Walrus configuration (testnet)
