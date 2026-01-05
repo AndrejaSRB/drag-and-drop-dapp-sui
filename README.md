@@ -59,7 +59,8 @@ The app supports different modes via environment variables in `.env.local`:
 |----------|---------|-------------|
 | `NEXT_PUBLIC_MOCK_WALRUS` | `true` | Skip real Walrus storage (use fake blobIds) |
 | `NEXT_PUBLIC_MOCK_SEAL` | `true` | Skip Seal encryption (no real encryption) |
-| `NEXT_PUBLIC_WALRUS_PUBLISHER` | Public testnet | Custom publisher URL |
+| `NEXT_PUBLIC_WALRUS_PUBLISHER` | - | Publisher URL for uploads (required when MOCK_WALRUS=false) |
+| `NEXT_PUBLIC_WALRUS_AGGREGATOR` | - | Aggregator URL for downloads (required when MOCK_WALRUS=false) |
 
 ### Recommended Configurations
 
@@ -89,18 +90,25 @@ Use a local Walrus publisher for complete end-to-end testing:
 NEXT_PUBLIC_MOCK_WALRUS=false
 NEXT_PUBLIC_MOCK_SEAL=false
 NEXT_PUBLIC_WALRUS_PUBLISHER=http://localhost:31415
+NEXT_PUBLIC_WALRUS_AGGREGATOR=http://localhost:31416
 ```
 
 See [Setting Up Local Publisher](#setting-up-local-walrus-publisher) below.
 
-#### 4. Public Testnet
+#### 4. Community Testnet Publisher
 
-Use the public Walrus testnet (requires funded publisher):
+Use a community-operated testnet publisher (no local setup needed):
 
 ```env
 NEXT_PUBLIC_MOCK_WALRUS=false
 NEXT_PUBLIC_MOCK_SEAL=false
+NEXT_PUBLIC_WALRUS_PUBLISHER=https://walrus-testnet-publisher.nami.cloud
+NEXT_PUBLIC_WALRUS_AGGREGATOR=https://aggregator.walrus-testnet.walrus.space
 ```
+
+Other community publishers:
+- NodeInfra: `https://walrus-testnet-publisher.nodeinfra.com`
+- RubyNodes: `https://walrus-publisher.rubynodes.io`
 
 ## Setting Up Local Walrus Publisher
 
@@ -130,6 +138,7 @@ Set your `.env.local`:
 NEXT_PUBLIC_MOCK_WALRUS=false
 NEXT_PUBLIC_MOCK_SEAL=false
 NEXT_PUBLIC_WALRUS_PUBLISHER=http://localhost:31415
+NEXT_PUBLIC_WALRUS_AGGREGATOR=http://localhost:31416
 ```
 
 ## Using Mocked Walrus/Seal
@@ -225,7 +234,7 @@ Package ID: 0x462708965638752db291d4a6809a5f43a95da2f77f926bb28cf20dd9cb261e31
 The Walrus publisher wallet needs SUI for gas. Either:
 - Use mock mode (`NEXT_PUBLIC_MOCK_WALRUS=true`)
 - Fund your local publisher wallet
-- Wait for public testnet publisher to be refilled
+- Use a community publisher (Nami Cloud, NodeInfra, RubyNodes)
 
 ### Wallet not connecting
 

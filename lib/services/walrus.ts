@@ -1,24 +1,12 @@
-import { WALRUS_PUBLISHER, WALRUS_AGGREGATOR } from "@/lib/constants";
-
 // ============================================
 // MOCK FLAGS - Control what gets skipped
-// ============================================
-// Override via environment variables:
-//   NEXT_PUBLIC_MOCK_WALRUS=false  → Use real Walrus
-//   NEXT_PUBLIC_MOCK_SEAL=false    → Use real Seal encryption
-//   NEXT_PUBLIC_WALRUS_PUBLISHER=http://localhost:31415 → Local publisher
-//
-// Recommended combinations:
-// - Both true:  Fast UI testing, no external deps
-// - SEAL false, WALRUS true:  Test encryption without needing funded publisher
-// - Both false: Full end-to-end flow (needs funded Walrus publisher)
 // ============================================
 export const MOCK_WALRUS = process.env.NEXT_PUBLIC_MOCK_WALRUS !== "false";
 export const MOCK_SEAL = process.env.NEXT_PUBLIC_MOCK_SEAL !== "false";
 
-// Allow overriding Walrus publisher URL via env (for local publisher)
-export const WALRUS_PUBLISHER_URL =
-  process.env.NEXT_PUBLIC_WALRUS_PUBLISHER || WALRUS_PUBLISHER;
+// Walrus URLs from environment (required when MOCK_WALRUS=false)
+export const WALRUS_PUBLISHER_URL = process.env.NEXT_PUBLIC_WALRUS_PUBLISHER || "";
+export const WALRUS_AGGREGATOR_URL = process.env.NEXT_PUBLIC_WALRUS_AGGREGATOR || "";
 
 export interface WalrusUploadResult {
   blobId: string;
@@ -158,7 +146,7 @@ export async function fetchBytesFromWalrus(
   }
 
   // REAL MODE: Fetch from Walrus aggregator
-  const response = await fetch(`${WALRUS_AGGREGATOR}/v1/blobs/${blobId}`);
+  const response = await fetch(`${WALRUS_AGGREGATOR_URL}/v1/blobs/${blobId}`);
 
   if (!response.ok) {
     throw new Error("Failed to fetch from Walrus");
@@ -186,7 +174,7 @@ export async function downloadFromWalrus(
   }
 
   // REAL MODE: Fetch from Walrus aggregator
-  const response = await fetch(`${WALRUS_AGGREGATOR}/v1/blobs/${blobId}`);
+  const response = await fetch(`${WALRUS_AGGREGATOR_URL}/v1/blobs/${blobId}`);
 
   if (!response.ok) {
     throw new Error("Failed to download from Walrus");
